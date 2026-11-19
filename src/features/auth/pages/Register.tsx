@@ -2,34 +2,70 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 function Register() {
-  const { register } = useAuth()
-  const navigate = useNavigate()
+  const { register } = useAuth();
+  const navigate = useNavigate();
 
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState('')
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  const handleRegister = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setError('')
+  // Local
+  // const handleRegister = (e: React.FormEvent<HTMLFormElement>) => {
+  //   e.preventDefault()
+  //   setError('')
+
+  //   if (password !== confirmPassword) {
+  //     setError('Passwords do not match')
+  //     return
+  //   }
+
+  //   try {
+  //     register(name, email, password)
+
+  //     navigate('/login')
+  //   } catch (error) {
+  //     setError(
+  //       error instanceof Error ? error.message : 'Registration failed.'
+  //     )
+  //   }
+  // }
+
+  // Supabase
+  const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    setError("");
+    setSuccess("");
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match')
-      return
+      setError("Passwords do not match.");
+      return;
     }
 
     try {
-      register(name, email, password)
+      const confirmationRequired = await register(name, email, password);
 
-      navigate('/login')
+      if (confirmationRequired) {
+        setSuccess(
+          "Registration successful! Please check your email to confirm your account before logging in.",
+        );
+      } else {
+        setSuccess(
+          "Registration successful! You can now log in using your account.",
+        );
+      }
+
+      setName("");
+      setEmail("");
+      setPassword("");
+      setConfirmPassword("");
     } catch (error) {
-      setError(
-        error instanceof Error ? error.message : 'Registration failed.'
-      )
+      setError(error instanceof Error ? error.message : "Registration failed.");
     }
-  }
+  };
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-950 px-4 py-10">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
@@ -40,10 +76,23 @@ function Register() {
         </div>
 
         <form onSubmit={handleRegister} className="space-y-4">
-
           {error && (
             <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
               {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="rounded-lg bg-green-50 p-3 text-sm text-green-700">
+              {success}
+
+              <button
+                type="button"
+                onClick={() => navigate("/login")}
+                className="mt-2 block font-semibold text-green-800 underline"
+              >
+                Go to Login
+              </button>
             </div>
           )}
 

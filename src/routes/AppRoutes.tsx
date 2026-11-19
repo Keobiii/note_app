@@ -7,7 +7,15 @@ import Register from "../features/auth/pages/Register";
 import { useAuth } from "../features/auth/context/AuthContext";
 
 function AppRoutes() {
-  const {currentUser} = useAuth();
+  const { currentUser, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-950">
+        <p className="text-sm text-white">Loading...</p>
+      </div>
+    );
+  }
 
   const homePage =
     currentUser?.access === "admin"
@@ -19,16 +27,19 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to={homePage} replace />} />
+
       <Route
         path="/login"
         element={currentUser ? <Navigate to={homePage} replace /> : <Login />}
       />
+
       <Route
         path="/register"
         element={
           currentUser ? <Navigate to={homePage} replace /> : <Register />
         }
       />
+
       <Route
         path="/admin"
         element={
@@ -41,6 +52,7 @@ function AppRoutes() {
           )
         }
       />
+
       <Route
         path="/user"
         element={
@@ -53,6 +65,7 @@ function AppRoutes() {
           )
         }
       />
+
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
