@@ -131,7 +131,7 @@ async function register(
   name: string,
   email: string,
   password: string,
-): Promise<boolean> {
+): Promise<User> {
   const { data, error } = await supabase.auth.signUp({
     email: email.trim().toLowerCase(),
     password,
@@ -154,15 +154,13 @@ async function register(
     throw new Error("Registration failed.");
   }
 
-  if (data.session) {
-    const { error: logoutError } = await supabase.auth.signOut();
-
-    if (logoutError) {
-      throw logoutError;
-    }
+  if (!data.session) {
+    throw new Error(
+      "Registration successful, but email confirmation is required.",
+    );
   }
 
-  return !data.session;
+  return getProfile(data.user.id, data.user.email || "");
 }
 
 // login
@@ -173,11 +171,6 @@ async function login(email: string, password: string): Promise<User> {
   });
 
   if (error) {
-    console.log("Signup error:", error);
-    console.log("Error message:", error.message);
-    console.log("Error code:", error.code);
-    console.log("Error status:", error.status);
-
     throw error;
   }
 
@@ -185,11 +178,24 @@ async function login(email: string, password: string): Promise<User> {
     throw new Error("Unable to retrieve user information");
   }
 
-  return getProfile(data.user.id, data.user.email || "");
+  try {
+    const user = await getProfile(data.user.id);
+
+    if (!user.is_active) {
+      throw new Error(
+        "Your account has been deactivated. Please contact the administrator.",
+      );
+    }
+
+    return user;
+  } catch (error) {
+    await supabase.auth.signOut();
+    throw error;
+  }
 }
 
 // get user profile
-async function getProfile(userId: string, email: string): Promise<User> {
+async function getProfile(userId: string): Promise<User> {
   const { data, error } = await supabase
     .from("profiles")
     .select("*")
@@ -203,11 +209,69 @@ async function getProfile(userId: string, email: string): Promise<User> {
   return {
     id: data.id,
     name: data.name,
-    email: email,
+    email: data.email,
     access: data.access,
+    is_active: data.is_active,
     date_created: data.date_created,
     date_updated: data.date_updated,
   };
+}
+
+// update profile
+async function updateProfile(name: string): Promise<User> {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError) {
+    throw userError;
+  }
+
+  if (!user) {
+    throw new Error("No authenticated user found");
+  }
+
+  // Update profile name
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({
+      name: name.trim(),
+      date_updated: new Date().toISOString(),
+    })
+    .eq("id", user.id);
+
+  if (profileError) {
+    throw profileError;
+  }
+
+  return getProfile(user.id);
+}
+
+// delete
+async function deactivateAccount(): Promise<void> {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    throw new Error("No authenticated user found.");
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      is_active: false,
+      date_updated: new Date().toISOString(),
+    })
+    .eq("id", user.id);
+
+  if (error) {
+    throw error;
+  }
+
+  await supabase.auth.signOut();
 }
 
 // logout
@@ -223,5 +287,7 @@ export const authService = {
   register,
   login,
   getProfile,
+  updateProfile,
+  deactivateAccount,
   logout,
 };

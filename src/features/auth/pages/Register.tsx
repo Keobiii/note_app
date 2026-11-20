@@ -46,22 +46,18 @@ function Register() {
     }
 
     try {
-      const confirmationRequired = await register(name, email, password);
-
-      if (confirmationRequired) {
-        setSuccess(
-          "Registration successful! Please check your email to confirm your account before logging in.",
-        );
-      } else {
-        setSuccess(
-          "Registration successful! You can now log in using your account.",
-        );
-      }
+      const user = await register(name, email, password);
 
       setName("");
       setEmail("");
       setPassword("");
       setConfirmPassword("");
+
+      if (user.access === "admin") {
+        navigate("/admin");
+      } else {
+        navigate("/user");
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : "Registration failed.");
     }

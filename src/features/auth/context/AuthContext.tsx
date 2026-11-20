@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -72,7 +73,9 @@ interface AuthContextType {
   currentUser: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<User>;
-  register: (name: string, email: string, password: string) => Promise<boolean>;
+  register: (name: string, email: string, password: string) => Promise<User>;
+  updateProfile: (name: string) => Promise<User>;
+  deactivateAccount: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -82,18 +85,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const isLoggingIn = useRef(false);
 
   // Listen to Supabase authentication changes
   useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (isLoggingIn.current) return;
+
       setSession(session);
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   // Retrieve profile whenever the session changes
@@ -103,17 +107,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!session) {
       setCurrentUser(null);
       setLoading(false);
-
       return;
     }
 
     setLoading(true);
 
     authService
-      .getProfile(session.user.id, session.user.email || "")
-      .then((user) => {
+      .getProfile(session.user.id)
+      .then(async (user) => {
+        if (!active) return;
+
+        if (!user.is_active) {
+          setCurrentUser(null);
+          await supabase.auth.signOut();
+          return;
+        }
+
+        setCurrentUser(user);
+      })
+      .catch(() => {
         if (active) {
-          setCurrentUser(user);
+          setCurrentUser(null);
         }
       })
       .finally(() => {
@@ -127,22 +141,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [session]);
 
+  // login
   const login = async (email: string, password: string): Promise<User> => {
-    const user = await authService.login(email, password);
+    isLoggingIn.current = true;
+
+    try {
+      const user = await authService.login(email, password);
+
+      setCurrentUser(user);
+
+      return user;
+    } finally {
+      isLoggingIn.current = false;
+    }
+  };
+
+  // register
+  const register = async (
+    name: string,
+    email: string,
+    password: string,
+  ): Promise<User> => {
+    return await authService.register(name, email, password);
+  };
+
+  // update
+  const updateProfile = async (name: string): Promise<User> => {
+    const user = await authService.updateProfile(name);
 
     setCurrentUser(user);
 
     return user;
   };
 
-  const register = async (
-    name: string,
-    email: string,
-    password: string,
-  ): Promise<boolean> => {
-    return await authService.register(name, email, password);
+  // delete
+  const deactivateAccount = async (): Promise<void> => {
+    await authService.deactivateAccount();
+
+    setCurrentUser(null);
+    setSession(null);
   };
 
+  // logout
   const logout = async () => {
     await authService.logout();
     setCurrentUser(null);
@@ -155,6 +195,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         login,
         register,
+        updateProfile,
+        deactivateAccount,
         logout,
       }}
     >

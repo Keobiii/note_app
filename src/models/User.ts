@@ -17,6 +17,7 @@ export interface User {
   name: string,
   email: string,
   access: UserAccess,
+  is_active: boolean;
   date_created: string,
   date_updated: string
 }
