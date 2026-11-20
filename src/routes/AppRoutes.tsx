@@ -5,6 +5,7 @@ import Admin from "../features/admin/pages/Admin";
 import User from "../features/user/pages/User";
 import Register from "../features/auth/pages/Register";
 import { useAuth } from "../features/auth/context/AuthContext";
+import Notes from "../features/user/pages/Notes";
 
 function AppRoutes() {
   const { currentUser, loading } = useAuth();
@@ -62,6 +63,19 @@ function AppRoutes() {
             <Navigate to="/admin" replace />
           ) : (
             <User />
+          )
+        }
+      />
+
+      <Route
+        path="/notes"
+        element={
+          !currentUser ? (
+            <Navigate to="/login" replace />
+          ) : currentUser.access !== "user" ? (
+            <Navigate to="/admin" replace />
+          ) : (
+            <Notes />
           )
         }
       />
